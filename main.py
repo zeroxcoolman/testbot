@@ -16,36 +16,58 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
 def get_enchantments(rod_name):
-    # Try different formatting variations
+    # First try the exact name as a page
+    base_url = "https://fischipedia.org/wiki/"
+    search_url = "https://fischipedia.org/w/index.php?search="
+    
+    # Try these variations in order
     variations = [
         rod_name,
-        rod_name + " (Rod)",
-        rod_name.replace(" rod", "").strip(),
-        rod_name.replace(" rod", "").strip() + " (Rod)"
+        f"{rod_name} (Rod)",
+        rod_name.replace(" Rod", ""),
+        f"{rod_name.replace(' Rod', '')} (Rod)",
+        rod_name + " Rod",  # For cases like "Ethereal" -> "Ethereal Rod"
+        f"{rod_name} Rod (Rod)"
     ]
     
+    # Remove duplicates while preserving order
+    seen = set()
+    variations = [v for v in variations if not (v in seen or seen.add(v))]
+    
     for variant in variations:
-        base_url = "https://fischipedia.org/wiki/"
         safe_name = urllib.parse.quote(variant.replace(" ", "_"))
         url = base_url + safe_name
-
+        
         try:
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, "html.parser")
                 
-                enchant_header = soup.find("span", id="Enchantments")
-                if not enchant_header:
-                    return url, "❌ Couldn't find enchantments section on the page."
-                    
-                enchant_section = enchant_header.find_parent("h2").find_next_sibling()
-                text = enchant_section.get_text(separator="\n").strip() if enchant_section else ""
+                # More flexible enchantment finding
+                enchant_header = soup.find(lambda tag: tag.name in ["h2", "h3"] and 
+                                         "enchant" in tag.text.lower())
                 
-                return url, text or "❌ No enchantments listed."
+                if not enchant_header:
+                    return url, "❌ Page exists but no enchantments section found."
+                    
+                content = []
+                next_tag = enchant_header.find_next_sibling()
+                while next_tag and next_tag.name not in ["h2", "h3"]:
+                    content.append(next_tag.get_text(separator="\n", strip=True))
+                    next_tag = next_tag.find_next_sibling()
+                
+                text = "\n".join(filter(None, content)) or "❌ No enchantments listed."
+                return url, text
+                
         except requests.RequestException:
             continue
     
-    return None, f"❌ Couldn't find page for any variation of '{rod_name}'."
+    # If no page found, return search results like your searchrod command
+    safe_search = urllib.parse.quote(rod_name)
+    return None, (f"❌ Couldn't find a dedicated page for '{rod_name}'.\n"
+                 f"🔍 Try searching here instead:\n"
+                 f"https://fischipedia.org/w/index.php?search={safe_search}&title=Special:Search&go=Go")
+
 
 @tree.command(name="enchant", description="Get recommended enchantments for a rod")
 @app_commands.describe(rod_name="Name of the rod to search for")
