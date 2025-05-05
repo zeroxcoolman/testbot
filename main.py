@@ -6,9 +6,12 @@ from bs4 import BeautifulSoup
 import urllib.parse
 import os
 
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("BOT_TOKEN") or "your_token_here"  # Fallback for testing
 
+# Enable necessary intents
 intents = discord.Intents.default()
+intents.message_content = True  # Required for slash commands to work properly
+
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
@@ -26,18 +29,21 @@ def get_enchantments(rod_name):
         safe_name = urllib.parse.quote(variant.replace(" ", "_"))
         url = base_url + safe_name
 
-        response = requests.get(url)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, "html.parser")
-            
-            enchant_header = soup.find("span", id="Enchantments")
-            if not enchant_header:
-                return url, "❌ Couldn't find enchantments section on the page."
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, "html.parser")
                 
-            enchant_section = enchant_header.find_parent("h2").find_next_sibling()
-            text = enchant_section.get_text(separator="\n").strip() if enchant_section else ""
-            
-            return url, text or "❌ No enchantments listed."
+                enchant_header = soup.find("span", id="Enchantments")
+                if not enchant_header:
+                    return url, "❌ Couldn't find enchantments section on the page."
+                    
+                enchant_section = enchant_header.find_parent("h2").find_next_sibling()
+                text = enchant_section.get_text(separator="\n").strip() if enchant_section else ""
+                
+                return url, text or "❌ No enchantments listed."
+        except requests.RequestException:
+            continue
     
     return None, f"❌ Couldn't find page for any variation of '{rod_name}'."
 
@@ -64,4 +70,14 @@ async def on_ready():
     await tree.sync()
     print(f"✅ Logged in as {bot.user}")
 
-bot.run(TOKEN)
+# Run the bot
+if __name__ == "__main__":
+    if not TOKEN:
+        print("❌ Error: No bot token found. Please set BOT_TOKEN environment variable.")
+    else:
+        try:
+            bot.run(TOKEN)
+        except discord.LoginFailure:
+            print("❌ Error: Invalid bot token. Please check your token.")
+        except Exception as e:
+            print(f"❌ An unexpected error occurred: {e}")
