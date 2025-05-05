@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 import urllib.parse
 import os
 
-TOKEN = os.getenv("DISCORD_TOKEN") or "your_token_here"  # Fallback for testing
+TOKEN = os.getenv("DISCORD_TOKEN") or "i aint putting my thing here bruh"  # Fallback for testing
 
 # Enable necessary intents
 intents = discord.Intents.default()
