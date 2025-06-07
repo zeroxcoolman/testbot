@@ -280,6 +280,7 @@ async def vouch(ctx, member: discord.Member, *, reason: str = "No reason provide
         # Original validations
         if not admin:
             if ctx.channel.name != "general":
+                print(ctx.channel.name)
                 return await ctx.send("❌ Use the vouch channel!")
             if ctx.author == member:
                 return await ctx.send("❌ You can't vouch yourself!")
